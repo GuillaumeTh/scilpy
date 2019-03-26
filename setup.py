@@ -7,6 +7,9 @@ ver_file = os.path.join('scilpy', 'version.py')
 with open(ver_file) as f:
     exec(f.read())
 
+with open('requirements.txt') as f:
+    required = f.read().splitlines()
+
 opts = dict(name=NAME,
             maintainer=MAINTAINER,
             maintainer_email=MAINTAINER_EMAIL,
@@ -21,8 +24,8 @@ opts = dict(name=NAME,
             platforms=PLATFORMS,
             version=VERSION,
             packages=PACKAGES,
-            install_requires=REQUIRES,
-            requires=REQUIRES,
+            install_requires=required,
+            requires=required,
             scripts=SCRIPTS)
 
 
