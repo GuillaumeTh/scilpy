@@ -8,11 +8,12 @@ import json
 import os
 
 import nibabel as nib
+
+from scilpy.io.utils import assert_inputs_exist
+
 if LooseVersion(nib.__version__) < LooseVersion('2.1.0'):
     raise ImportError("Unable to import the Nibabel streamline API. "
                       "Nibabel >= v2.1.0 is required")
-
-from scilpy.io.utils import assert_inputs_exist
 
 
 def _build_arg_parser():
