@@ -3,9 +3,9 @@
 from __future__ import print_function
 
 import argparse
+import os
 from distutils.version import LooseVersion
 import json
-import os
 
 import nibabel as nib
 
