@@ -140,3 +140,34 @@ def get_theta(requested_theta, tracking_type):
     else:
         theta = 45
     return theta
+
+def compute_average_streamlines_length(streamlines):
+    """
+    Parameters
+    ----------
+    streamlines: list
+        List of list of 3D points.
+
+    Return
+    ------
+    average: float
+        Average length in mm.
+    """
+    return np.average(list(dipy.tracking.utils.length(streamlines)))
+
+def sample_distribution(dist):
+    """
+    Parameters
+    ----------
+    dist: numpy.array
+        The empirical distribution to sample from.
+
+    Return
+    ------
+    ind: int
+        The index of the sampled element.
+    """
+    cdf = dist.cumsum()
+    if cdf[-1] == 0:
+        return None
+    return cdf.searchsorted(np.random.random() * cdf[-1])
