@@ -13,9 +13,7 @@
 "3":
     {"name": "NUCLEI",
     "theta": 10,
-    "step_size": 0.1,
-    "max_random_ending": 0.99,
-    "min_distance_before_stop": 20},
+    "step_size": 0.5},
 "4":
     {"name": "CSF",
     "theta": 10,

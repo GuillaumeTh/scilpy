@@ -30,7 +30,6 @@ class tissue_tracker(object):
 class wm_tissue_tracker(tissue_tracker):
     def __init__(self, tracker, odf_dataset, basis, sf_threshold, sf_threshold_init, config, dipy_sphere):
         self.tissue_value = "1"
-        self.stop_in_tissue = False
         super(wm_tissue_tracker, self).__init__(tracker, odf_dataset, basis, sf_threshold, sf_threshold_init, config, dipy_sphere)
 
     def get_segment(self, pos, v_in):
@@ -49,7 +48,7 @@ class wm_tissue_tracker(tissue_tracker):
 
         return newPos, newDir, is_valid_direction
     
-    def _append_to_line(self, new_pos, new_dir, line, line_dirs, stop_in_tissue=False):
+    def _append_to_line(self, new_pos, new_dir, line, line_dirs):
         line.append(new_pos)
         line_dirs.append(new_dir)
         return line, line_dirs, False
@@ -57,13 +56,12 @@ class wm_tissue_tracker(tissue_tracker):
 class gm_tissue_tracker(tissue_tracker):
     def __init__(self, tracker, odf_dataset, basis, sf_threshold, sf_threshold_init, config, dipy_sphere):
         self.tissue_value = "2"
-        self.stop_in_tissue = False
         super(gm_tissue_tracker, self).__init__(tracker, odf_dataset, basis, sf_threshold, sf_threshold_init, config, dipy_sphere)
 
     def get_segment(self, pos, v_in):
-        return None, None, True
+        return None, None, False
     
-    def _append_to_line(self, new_pos, new_dir, line, line_dirs, stop_in_tissue=False):
+    def _append_to_line(self, new_pos, new_dir, line, line_dirs):
         line.append(new_pos)
         line_dirs.append(new_dir)
         return line, line_dirs, True
@@ -72,9 +70,6 @@ class nuclei_tissue_tracker(tissue_tracker):
     def __init__(self, tracker, odf_dataset, basis, sf_threshold, sf_threshold_init, config, dipy_sphere):
         self.tissue_value = "3"
         self.config = config
-        self.stop_in_tissue = True
-        self.max_random_ending = config[self.tissue_value]['max_random_ending']
-        self.min_distance = config[self.tissue_value]['min_distance_before_stop']
         super(nuclei_tissue_tracker, self).__init__(tracker, odf_dataset, basis, sf_threshold, sf_threshold_init, config, dipy_sphere)
 
     def get_segment(self, pos, v_in):
@@ -84,66 +79,65 @@ class nuclei_tissue_tracker(tissue_tracker):
         newPos = pos + self.step_size * np.array(newDir)
         return newPos, newDir, is_valid_direction
     
-    def _append_to_line(self, new_pos, new_dir, line, line_dirs, stop_in_tissue=True):
+    def _append_to_line(self, new_pos, new_dir, line, line_dirs):
         line.append(new_pos)
         line_dirs.append(new_dir)
-        if stop_in_tissue:
-            number = np.random.rand()
-            if number >= self.max_random_ending:
-                new_line = [new_pos]
-                new_dirs = [new_dir]
-                distance = 0
-                while len(new_line) < self.tracker.max_nbr_points:
-                    new_pos, new_dir, valid_direction_nbr = self.tracker.propagate(
-                        new_line[-1], new_dirs[-1])
-                    if valid_direction_nbr != self.tissue_value and valid_direction_nbr is not None:
-                        distance += self.tracker.tracker_functions[valid_direction_nbr].step_size
+        # new_line = [new_pos]
+        # new_dirs = [TrackingDirection(-np.array(new_dir), new_dir.index)]
+        # history = []
+        # while len(new_line) < self.tracker.max_nbr_points:
+        #     new_pos, new_dir, valid_direction_nbr = self.tracker.propagate(
+        #         new_line[-1], new_dirs[-1])
+            
+        #     if new_pos is None or new_dir is None:
+        #         break
+        #     history.append(self.tracker.get_tissue_tracker_function(new_pos).tissue_value)
+        #     is_finished = False
+        #     if len(new_line) == 1:
+        #         new_line.append(new_pos)
+        #         new_dirs.append(new_dir)
+        #     elif len(np.where(history[-5:-1] == self.tissue_value)) > 5:
+        #         print("allo")
+        #         break
+        #     elif self.tracker.get_tissue_tracker_function(new_line[-1]).tissue_value == self.tracker.get_tissue_tracker_function(new_line[-2]).tissue_value:
+        #         new_line.append(new_pos)
+        #         new_dirs.append(new_dir)
+        #     else:
+        #         new_line, new_dirs, is_finished = append_to_line(self.tracker, valid_direction_nbr, new_pos, new_dir, new_line, new_dirs)
 
-                    if distance > self.min_distance:
-                        stop_in_tissue=True
-                    else:
-                        stop_in_tissue=False
+        #     if new_line is None or new_dirs is None:
+        #         break
 
-                    new_line, new_dirs, is_finished = append_to_line(self.tracker, valid_direction_nbr, new_pos, new_dir, new_line, new_dirs, stop_in_tissue=stop_in_tissue)
-
-                    if new_line is None or new_dirs is None:
-                        break
-
-                    if is_finished:
-                        return [line, new_line], [line_dirs, new_dirs], True
-                return line, line_dirs, True
-        return line, line_dirs, False
+        #     if is_finished:
+        #         return [line, new_line], [line_dirs, new_dirs], True
+        return line, line_dirs, True
     
 class csf_tissue_tracker(tissue_tracker):
     def __init__(self, tracker, odf_dataset, basis, sf_threshold, sf_threshold_init, config, dipy_sphere):
         self.tissue_value = "4"
-        self.stop_in_tissue = False
         super(csf_tissue_tracker, self).__init__(tracker, odf_dataset, basis, sf_threshold, sf_threshold_init, config, dipy_sphere)
 
     def get_segment(self, pos, v_in):
-        return None, None, None
+        return None, None, False
     
-    def _append_to_line(self, new_pos, new_dir, line, line_dirs, stop_in_tissue=False):
+    def _append_to_line(self, new_pos, new_dir, line, line_dirs):
         return None, None, True
 
 class background_tissue_tracker(tissue_tracker):
     def __init__(self, tracker, odf_dataset, basis, sf_threshold, sf_threshold_init, config, dipy_sphere):
         self.tissue_value = "0"
-        self.stop_in_tissue = False
         super(background_tissue_tracker, self).__init__(tracker, odf_dataset, basis, sf_threshold, sf_threshold_init, config, dipy_sphere)
 
     def get_segment(self, pos, v_in):
-        return None, None, None
+        return None, None, False
     
-    def _append_to_line(self, new_pos, new_dir, line, line_dirs, stop_in_tissue=False):
+    def _append_to_line(self, new_pos, new_dir, line, line_dirs):
         return None, None, True
 
-def append_to_line(tracker, tissue_key, new_pos, new_dir, line, line_dirs, stop_in_tissue=None):
+def append_to_line(tracker, tissue_key, new_pos, new_dir, line, line_dirs):
     if tissue_key in tissue_trackers.keys():
         tracker_f = tracker.tracker_functions[tissue_key]
-        if stop_in_tissue is None:
-            stop_in_tissue = tracker.tracker_functions[tissue_key].stop_in_tissue
-        return tracker_f._append_to_line(new_pos, new_dir, line, line_dirs, stop_in_tissue=stop_in_tissue)
+        return tracker_f._append_to_line(new_pos, new_dir, line, line_dirs)
     else:
         return None, None, True
 
