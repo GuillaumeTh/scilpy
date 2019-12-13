@@ -161,7 +161,7 @@ def get_data(nSub, dwi, t1s, associations, nRun, default_readout):
 
     # Find b0 for topup, take the first one
     revb0_path = ''
-    totalreadout = ''
+    totalreadout = default_readout
     for nfmap in fmaps:
         nfmap_metadata = get_metadata(nfmap)
         if 'PhaseEncodingDirection' in nfmap_metadata:
