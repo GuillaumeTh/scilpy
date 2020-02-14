@@ -45,6 +45,9 @@ def _build_arg_parser():
         '-t', dest='int_thres', metavar='THRESHOLD', type=float, default=0.1,
         help='Minimum wm PVE values in a voxel to be in to the '
              'seeding_mask. [0.1]')
+    p.add_argument(
+        '--end_in_nuclei', action="store_true",
+        help='Nuclei in the include map. [False]')
     add_overwrite_arg(p)
     add_verbose_arg(p)
     return p
@@ -79,18 +82,30 @@ def main():
     thalamus_pve = segmentation[:,:,:,11]
 
     include_map = gm_pve
-    include_map[background > 0.5] = 1
 
     exclude_map = ventricules_pve
-    exclude_map += putamen_pve
-    exclude_map += pallidum_pve
-    exclude_map += hippocampus_pve
-    exclude_map += caudate_pve
-    exclude_map += amygdala_pve
-    exclude_map += accumbens_pve
-    exclude_map += plexus_pve
-    exclude_map += thalamus_pve
+
+    if args.end_in_nuclei:
+        include_map += putamen_pve
+        include_map += pallidum_pve
+        include_map += hippocampus_pve
+        include_map += caudate_pve
+        include_map += amygdala_pve
+        include_map += accumbens_pve
+        include_map += plexus_pve
+        include_map += thalamus_pve
+    else:
+        exclude_map += putamen_pve
+        exclude_map += pallidum_pve
+        exclude_map += hippocampus_pve
+        exclude_map += caudate_pve
+        exclude_map += amygdala_pve
+        exclude_map += accumbens_pve
+        exclude_map += plexus_pve
+        exclude_map += thalamus_pve
+
     exclude_map[exclude_map < 0.5] = 0
+    include_map[background > 0.5] = 1
 
     labels = np.argmax(segmentation, axis=3)
     seeding_mask = np.zeros(wm_pve.shape)
