@@ -81,9 +81,9 @@ def main():
     plexus_pve = segmentation[:,:,:,10]
     thalamus_pve = segmentation[:,:,:,11]
 
-    include_map = gm_pve
+    include_map = np.zeros(gm_pve.shape)
 
-    exclude_map = ventricules_pve
+    exclude_map = np.zeros(ventricules_pve.shape)
 
     if args.end_in_nuclei:
         include_map += putamen_pve
@@ -94,6 +94,7 @@ def main():
         include_map += accumbens_pve
         include_map += plexus_pve
         include_map += thalamus_pve
+        include_map[include_map < 0.8] = 0
     else:
         exclude_map += putamen_pve
         exclude_map += pallidum_pve
@@ -103,6 +104,9 @@ def main():
         exclude_map += accumbens_pve
         exclude_map += plexus_pve
         exclude_map += thalamus_pve
+
+    include_map += gm_pve
+    exclude_map += ventricules_pve
 
     exclude_map[exclude_map < 0.5] = 0
     include_map[background > 0.5] = 1
