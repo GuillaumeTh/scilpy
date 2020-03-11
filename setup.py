@@ -38,6 +38,7 @@ opts = dict(name=NAME,
             platforms=PLATFORMS,
             version=VERSION,
             packages=find_packages(),
+            setup_requires=["cython (>=0.29.12)", "numpy (>=1.16.2)"],
             install_requires=REQUIRES,
             scripts=SCRIPTS,
             ext_modules=[
