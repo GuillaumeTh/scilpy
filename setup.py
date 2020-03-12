@@ -3,6 +3,11 @@ import os
 from setuptools import setup, find_packages
 from setuptools.command.build_ext import build_ext
 from setuptools.extension import Extension
+try:
+    import Cython
+except ImportError:
+    RuntimeError('Need cython to build extensions '
+                 'but cannot import "Cython"')
 PACKAGES = find_packages()
 
 # Get version and release info, which is all stored in scilpy/version.py
@@ -38,7 +43,6 @@ opts = dict(name=NAME,
             platforms=PLATFORMS,
             version=VERSION,
             packages=find_packages(),
-            setup_requires=["Cython (>=0.29.12)", "numpy (>=1.16.2)"],
             install_requires=REQUIRES,
             scripts=SCRIPTS,
             ext_modules=[
@@ -48,7 +52,8 @@ opts = dict(name=NAME,
                           ['scilpy/tractanalysis/quick_tools.pyx']),
                 Extension('scilpy.tractanalysis.streamlines_metrics',
                           ['scilpy/tractanalysis/streamlines_metrics.pyx'])],
-            cmdclass={'build_ext': build_inplace_all_ext})
+            cmdclass={'build_ext': build_inplace_all_ext},
+            setup_requires=["Cython", "numpy"],)
 
 
 if __name__ == '__main__':
