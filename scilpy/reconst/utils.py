@@ -4,7 +4,7 @@ from __future__ import division
 import warnings
 
 from dipy.direction.peaks import peak_directions
-from dipy.reconst.shm import sph_harm_lookup
+from dipy.reconst.shm import sph_harm_lookup, smooth_pinv
 import numpy as np
 
 
@@ -46,3 +46,20 @@ def get_maximas(data, sphere, b_matrix, threshold, absolute_threshold,
     spherical_func[np.nonzero(spherical_func < absolute_threshold)] = 0.
     return peak_directions(
         spherical_func, sphere, threshold, min_separation_angle)
+
+class SphericalHarmonics():
+
+    def __init__(self, odf_data, basis, sphere):
+        self.basis = basis
+        self.order = find_order_from_nb_coeff(odf_data)
+        self.sphere = sphere
+        B, self.m, self.n = get_b_matrix(self.order, self.sphere, self.basis,
+                                         return_all=True)
+        self.B = np.ascontiguousarray(np.matrix(B), dtype=np.float64)
+        invB = smooth_pinv(self.B, np.sqrt(0.006) * (-self.n * (self.n + 1)))
+        self.invB = np.ascontiguousarray(np.matrix(invB), dtype=np.float64)
+
+    def get_SF(self, sh):
+        a = np.ascontiguousarray(sh, dtype=np.float64)
+        SF = np.dot(self.B, a).reshape((np.shape(self.sphere.vertices)[0], 1))
+        return SF

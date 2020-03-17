@@ -3,6 +3,10 @@
 import numpy as np
 from numpy.lib.index_tricks import r_ as row
 
+def abstract():
+    import inspect
+    caller = inspect.getouterframes(inspect.currentframe())[1][3]
+    raise NotImplementedError(caller + ' must be implemented in subclass')
 
 def voxel_to_world(coord, affine):
     """Takes a n dimensionnal voxel coordinate and returns its 3 first

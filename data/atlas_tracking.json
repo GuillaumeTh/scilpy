@@ -1,0 +1,21 @@
+{"0":
+    {"name": "BACKGROUND",
+    "theta": 20,
+    "step_size": 0.5},
+"1":
+    {"name": "WM",
+    "theta": 20,
+    "step_size": 0.5},
+"2":
+    {"name": "GM",
+    "theta": 10,
+    "step_size": 0.2},
+"3":
+    {"name": "NUCLEI",
+    "theta": 10,
+    "step_size": 0.5},
+"4":
+    {"name": "CSF",
+    "theta": 10,
+    "step_size": 0.2}
+}
