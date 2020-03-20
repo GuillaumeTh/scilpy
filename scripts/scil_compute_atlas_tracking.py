@@ -94,23 +94,6 @@ def buildArgsParser():
         metavar='STEP', type=float, default=0.5,
         help='Step size in mm. [%(default)s]')
 
-    # p.add_argument(
-    #     '--rk_order', action='store', metavar='ORDER', type=int, default=2,
-    #     choices=[1, 2, 4],
-    #     help='The order of the Runge-Kutta integration used for \nthe step ' +
-    #          'function. Must be 1, 2 or 4. [%(default)s]\nAs a rule of thumb' +
-    #          ', doubling the rk_order will double \nthe computation time ' +
-    #          'in the worst case.')
-
-    # deviation_angle_group = p.add_mutually_exclusive_group()
-    # deviation_angle_group.add_argument(
-    #     '--theta', dest='theta', action='store',
-    #     metavar='ANGLE', type=float,
-    #     help="Maximum angle between 2 steps. ['det'=45, 'prob'=20]")
-    # deviation_angle_group.add_argument(
-    #     '--curvature', dest='curvature', action='store',
-    #     metavar='RADIUS', type=float,
-    #     help='Minimum radius of curvature R in mm. Replaces --theta.')
     p.add_argument(
         '--maxL_no_dir', dest='maxL_no_dir', action='store',
         metavar='MAX', type=float, default=1,
@@ -141,7 +124,7 @@ def buildArgsParser():
         "or 'tl' (trilinear). [%(default)s]")
     p.add_argument(
         '--mask_interp', dest='mask_interp', action='store',
-        metavar='INTERP', type=str, default='nn', choices=['nn', 'tl'],
+        metavar='INTERP', type=str, default='tl', choices=['nn', 'tl'],
         help="Mask interpolation:\n'nn' (nearest-neighbor) or 'tl' " +
         "(trilinear). [%(default)s]")
 
@@ -285,7 +268,7 @@ def main():
     #                                nbr_processes=args.nbr_processes,
     #                                pft_tracker=None,
     #                                save_seeds=args.save_seeds)
-    
+    print("begin")
     streamlines, seeds = track(tracker, mask, seed, param,
                                 nbr_processes=args.nbr_processes,
                                 save_seeds=args.save_seeds)
