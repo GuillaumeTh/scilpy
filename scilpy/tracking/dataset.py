@@ -95,8 +95,33 @@ class Dataset(object):
         else:
             raise Exception("Invalid interpolation method.")
 
-        # Squeezing returns only value instead of array of length 1 if 3D data
         return np.squeeze(result)
+
+
+    def getPositionValueFromAtlas(self, x, y, z):
+        """
+        get the voxel value at voxel coordinate x, y, z in the dataset
+        if the coordinates are out of bound, the nearest voxel value is taken.
+        return value
+        """
+        if not self.isPositionInBound(x, y, z):
+            eps = float(1e-8)  # Epsilon to exclude upper borders
+            x = max(-self.size[0] / 2,
+                    min(self.size[0] * (self.dim[0] - 0.5 - eps), x))
+            y = max(-self.size[1] / 2,
+                    min(self.size[1] * (self.dim[1] - 0.5 - eps), y))
+            z = max(-self.size[2] / 2,
+                    min(self.size[2] * (self.dim[2] - 0.5 - eps), z))
+        coord = np.array(self.getVoxelCoordinate(x, y, z), dtype=np.float64)
+
+        if self.interpolation == 'nearest':
+            result = nearestneighbor_interpolate(self.data, coord)
+        elif self.interpolation == 'trilinear':
+            result = trilinear_interpolate4d(self.data, coord)
+        else:
+            raise Exception("Invalid interpolation method.")\
+
+        return np.argmax(result)
 
     def isPositionInBound(self, x, y, z):
         """

@@ -15,11 +15,11 @@ class abstractTracker(object):
         self.step_size = param['step_size']
         self.sf_threshold = param['sf_threshold']
         self.sf_threshold_init = param['sf_threshold_init']
-        unique_atlas_val = np.unique(atlas.data)
+        unique_atlas_val = list(config.keys())
         self.tracker_functions = {}
         for label in unique_atlas_val:
-            tracker_f = tissue_trackers[str(int(label))]
-            self.tracker_functions[str(int(label))] = tracker_f(self, self.odf, self.basis, self.sf_threshold, self.sf_threshold_init, self.config, dipy_sphere='symmetric724')
+            tracker_f = tissue_trackers[label]
+            self.tracker_functions[label] = tracker_f(self, self.odf, self.basis, self.sf_threshold, self.sf_threshold_init, self.config, dipy_sphere='symmetric724')
 
 
     def initialize(self, pos):
@@ -38,7 +38,7 @@ class abstractTracker(object):
         return self.forward_dir is not None and self.backward_dir is not None
     
     def get_tissue_tracker_function(self, pos):
-        tissue = int(self.atlas.getPositionValue(pos[0], pos[1], pos[2]))
+        tissue = int(self.atlas.getPositionValueFromAtlas(pos[0], pos[1], pos[2]))
         return self.tracker_functions[str(tissue)]
 
     def propagate(self, pos, v_in):
@@ -49,7 +49,7 @@ class abstractTracker(object):
         tissue_tracker = self.get_tissue_tracker_function(pos)
         newpos, newdir, is_valid = tissue_tracker.get_segment(pos, v_in)
         if is_valid:
-            return newpos, newdir, str(int(self.atlas.getPositionValue(newpos[0], newpos[1], newpos[2])))
+            return newpos, newdir, str(int(self.atlas.getPositionValueFromAtlas(newpos[0], newpos[1], newpos[2])))
         else:
             return None, None, None
 

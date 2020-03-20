@@ -1,21 +1,67 @@
-{"0":
-    {"name": "BACKGROUND",
-    "theta": 20,
-    "step_size": 0.5},
-"1":
-    {"name": "WM",
-    "theta": 20,
-    "step_size": 0.5},
-"2":
-    {"name": "GM",
-    "theta": 10,
-    "step_size": 0.2},
-"3":
-    {"name": "NUCLEI",
-    "theta": 10,
-    "step_size": 0.5},
-"4":
-    {"name": "CSF",
-    "theta": 10,
-    "step_size": 0.2}
+{
+    "0": {
+        "name": "BACKGROUND",
+        "theta": 20,
+        "step_size": 0.5
+    },
+    "1": {
+        "name": "WM",
+        "theta": 20,
+        "step_size": 0.5
+    },
+    "2": {
+        "name": "GM",
+        "theta": 10,
+        "step_size": 0.2
+    },
+    "3": {
+        "name": "VENTRICULES",
+        "theta": 10,
+        "step_size": 0.2
+    },
+    "4": {
+        "name": "PUTAMEN",
+        "theta": 10,
+        "step_size": 0.5
+    },
+    "5": {
+        "name": "PALLIDUM",
+        "theta": 10,
+        "step_size": 0.5
+    },
+    "6": {
+        "name": "HIPPOCAMPUS",
+        "theta": 10,
+        "step_size": 0.5
+    },
+    "7": {
+        "name": "CAUDATE",
+        "theta": 10,
+        "step_size": 0.5
+    },
+    "8": {
+        "name": "AMYGDALA",
+        "theta": 10,
+        "step_size": 0.5
+    },
+    "9": {
+        "name": "ACCUMBENS",
+        "theta": 10,
+        "step_size": 0.5
+    },
+    "11": {
+        "name": "THALAMUS",
+        "theta": 10,
+        "step_size": 0.5
+    },
+    "10": {
+        "name": "PLEXUS",
+        "theta": 10,
+        "step_size": 0.5
+    },
+    "12": {
+        "name": "EXTERNAL_CSF",
+        "theta": 10,
+        "step_size": 0.5
+    }
 }

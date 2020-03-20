@@ -337,12 +337,12 @@ def _get_line(tracker, mask, param, is_forward):
 
     return None
 
-    if line is not None and len(np.shape(line)) == 1:
-        for l in line:
-            while l is not None and len(l) > 0 and not tracker.isPositionInBound(l[-1]):
-                l.pop()
-        return line
-    else:
-        while line is not None and len(line) > 0 and not tracker.isPositionInBound(line[-1]):
-            line.pop()
-        return line
+    # if line is not None and len(np.shape(line)) == 1:
+    #     for l in line:
+    #         while l is not None and len(l) > 0 and not tracker.isPositionInBound(l[-1]):
+    #             l.pop()
+    #     return line
+    # else:
+    #     while line is not None and len(line) > 0 and not tracker.isPositionInBound(line[-1]):
+    #         line.pop()
+    #     return line
