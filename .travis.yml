@@ -17,7 +17,8 @@ stage: Tests
 script:
   - python setup.py develop
   - export MPLBACKEND="agg"
-  - pytest -v
+  - pytest scripts/tests/test_compute_bundle_profiles.py
+  - pytest scripts/tests/test_compute_bundle_profiles.py
 
 
 jobs:
