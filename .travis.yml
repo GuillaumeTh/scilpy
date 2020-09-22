@@ -17,7 +17,6 @@ stage: Tests
 script:
   - python setup.py develop
   - export MPLBACKEND="agg"
-  - export PYTHONIOENCODING=utf8
   - pytest -v
 
 
