@@ -57,18 +57,19 @@ def main():
         val = test[i].dropna().values
         mean = np.mean(val)
         std = np.std(val)
+        print(mean, std, val)
         for index, value in test[i].dropna().iteritems():
             if value == np.nan:
                 continue
             if value < 50:
                 rating = "Fail"
                 comment = "Under 50 streamlines"
-            elif value <= mean + std or value >= mean - std:
+            elif value <= mean + std and value >= mean - std:
                 rating = "Pass"
                 comment = ""
-            elif value <= (mean + 1.5 * std) or value >= (mean - 1.5 * std):
+            elif value <= (mean + 2 * std) and value >= (mean - 2 * std):
                 rating = "Warning"
-                comment = "Number of streamlines between mean +- 1.5 std"
+                comment = "Number of streamlines between mean +- 2 std"
             else:
                 rating = "Fail"
                 comment = "Number of streamlines under or upper than mean +- 1.5 std"
