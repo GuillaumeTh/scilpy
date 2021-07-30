@@ -64,15 +64,15 @@ def main():
             if value < 50:
                 rating = "Fail"
                 comment = "Under 50 streamlines"
-            elif value <= mean + 2 * std and value >= mean - std:
+            elif value <= mean + 2.5 * std and value >= mean - std:
                 rating = "Pass"
                 comment = ""
-            elif value <= (mean + 3 * std) and value >= (mean - 2 * std):
+            elif value <= (mean + 3.5 * std) and value >= (mean - 1.5 * std):
                 rating = "Warning"
-                comment = "Number of streamlines between mean + 3 and - 2 std"
+                comment = "Number of streamlines between mean + 3.5 and - 1.5 std"
             else:
                 rating = "Fail"
-                comment = "Number of streamlines under or upper than mean + 3 and -2 std"
+                comment = "Number of streamlines under or upper than mean + 3.5 and - 1.5 std"
             if i in report_dict:
                 report_dict[i][index] = {"status": rating, "comments": comment}
             else:
