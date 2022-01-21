@@ -138,7 +138,7 @@ class DataVolume(object):
         else:
             raise ValueError("Origin should be 'center' or 'corner'.")
 
-    def voxmm_to_value(self, x, y, z, origin):
+    def voxmm_to_value(self, x, y, z, origin, interpolator=None):
         """
         Get the voxel value at voxel position x, y, z (mm) in the dataset.
         If the coordinates are out of bound, the nearest voxel value is taken.
@@ -159,7 +159,7 @@ class DataVolume(object):
             Interpolated value at position x, y, z (mm). If the last dimension
             is of length 1, return a scalar value.
         """
-        if self.interpolation is not None:
+        if self.interpolation is not None or interpolator is not None:
             if not self.is_voxmm_in_bound(x, y, z, origin):
                 eps = float(1e-8)  # Epsilon to exclude upper borders
                 if origin == 'corner':
@@ -185,9 +185,12 @@ class DataVolume(object):
             # Interpolation: Using dipy's pyx methods. The doc can be found in
             # the file dipy.core.interpolation.pxd. Dipy works with origin
             # center.
+            curr_interp = self.interpolation
+            if interpolator is not None:
+                curr_interp = interpolator
             if origin == 'corner':
                 coord -= 0.5
-            if self.interpolation == 'nearest':
+            if curr_interp == 'nearest':
                 # They use round(point), not floor. This is the equivalent of
                 # origin = 'center'.
                 result = nearestneighbor_interpolate(self.data, coord)

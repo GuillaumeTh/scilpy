@@ -27,6 +27,7 @@ class SeedGenerator(object):
         """
         self.data = data
         self.voxres = voxres
+        self.percentage_stop = 0.3
 
         # Everything scilpy.tracking is in 'corner', 'voxmm'
         self.origin = 'corner'
@@ -39,7 +40,7 @@ class SeedGenerator(object):
         if len(self.seeds) == 0:
             logging.warning("There are positive voxels in the seeding mask!")
 
-    def get_next_pos(self, random_generator, indices, which_seed):
+    def get_next_pos(self, random_generator, indices, which_seed, is_adaptative=False):
         """
         Generate the next seed position (Space=voxmm, origin=corner).
 
@@ -71,6 +72,11 @@ class SeedGenerator(object):
         r_x = random_generator.uniform(0, voxel_dim[0])
         r_y = random_generator.uniform(0, voxel_dim[1])
         r_z = random_generator.uniform(0, voxel_dim[2])
+
+        if is_adaptative:
+            return ((x * self.voxres[0] + r_x, y * self.voxres[1] \
+            + r_y, z * self.voxres[2] + r_z),
+            random_generator.random() < self.percentage_stop)
 
         return x * self.voxres[0] + r_x, y * self.voxres[1] \
             + r_y, z * self.voxres[2] + r_z

@@ -3,6 +3,7 @@ import itertools
 import logging
 import multiprocessing
 import os
+import random
 import sys
 import traceback
 
@@ -12,8 +13,10 @@ import numpy as np
 from dipy.tracking.streamlinespeed import compress_streamlines
 
 from scilpy.image.datasets import DataVolume
+from scilpy.tracking import tissue_configurator
 from scilpy.tracking.propagator import AbstractPropagator
 from scilpy.tracking.seed import SeedGenerator
+from scilpy.tracking.tissue_configurator import get_tissue_configurator
 
 # For the multi-processing:
 data_file_info = None
@@ -339,6 +342,253 @@ class Tracker(object):
         while (len(line) > 1 and
                not self.propagator.is_voxmm_in_bound(line[-1],
                                                      origin=self.origin)):
+            line.pop()
+
+        return line
+
+
+class TissueTracker(Tracker):
+
+    def __init__(self, propagator: AbstractPropagator, mask: DataVolume,
+                 seed_generator: SeedGenerator, config, nbr_seeds, min_nbr_pts,
+                 max_nbr_pts, max_invalid_dirs, compression_th=0.1,
+                 nbr_processes=1, save_seeds=False, mmap_mode=None,
+                 rng_seed=1234, track_forward_only=False, skip=0):
+        """
+        Parameters
+        ----------
+        propagator : AbstractPropagator
+            Tracking object.
+        mask : DataVolume
+            Tracking volume(s).
+        seed_generator : SeedGenerator
+            Seeding volume.
+        config : dict
+            Tracking configuration for each tissue
+        nbr_seeds: int
+            Number of seeds to create via the seed generator.
+        min_nbr_pts: int
+        max_nbr_pts: int
+        max_invalid_dirs: int
+            Number of consecutives invalid directions allowed during tracking.
+        compression_th : float,
+            Maximal distance threshold for compression. If None or 0, no
+            compression is applied.
+        nbr_processes: int
+            Number of sub processes to use.
+        save_seeds: bool
+            Whether to save the seeds associated to their respective
+            streamlines.
+        mmap_mode: str
+            Memory-mapping mode. One of {None, ‘r+’, ‘r’, ‘w+’, ‘c’}
+        rng_seed: int
+            The random "seed" for the random generator.
+        track_forward_only: bool
+            If true, only the forward direction is computed.
+        skip: int
+            Skip the first N seeds created (and thus N rng numbers). Useful if
+            you want to create new streamlines to add to a previously created
+            tractogram with a fixed rng_seed. Ex: If tractogram_1 was created
+            with nbr_seeds=1,000,000, you can create tractogram_2 with
+            skip 1,000,000.
+        """
+        super().__init__(propagator, mask,
+                         seed_generator, nbr_seeds, min_nbr_pts,
+                         max_nbr_pts, max_invalid_dirs, compression_th,
+                         nbr_processes, save_seeds, mmap_mode,
+                         rng_seed, track_forward_only, skip)
+        
+        self.config = config
+
+
+    def _get_streamlines(self, chunk_id):
+        """
+        Tracks the n streamlines associates with current process (identified by
+        chunk_id). The number n is the total number of seeds / the number of
+        processes. If asked by user, may compress the streamlines and save the
+        seeds.
+
+        Parameters
+        ----------
+        chunk_id: int
+            This process ID.
+
+        Returns
+        -------
+        streamlines: list
+            The successful streamlines.
+        seeds: list
+            The list of seeds for each streamline, if self.save_seeds. Else, an
+            empty list.
+        """
+        streamlines = []
+        seeds = []
+
+        # Initialize the random number generator to cover multiprocessing,
+        # skip, which voxel to seed and the subvoxel random position
+        chunk_size = int(self.nbr_seeds / self.nbr_processes)
+        first_seed_of_chunk = chunk_id * chunk_size + self.skip
+        random_generator, indices = self.seed_generator.init_generator(
+            self.rng_seed, first_seed_of_chunk)
+        if chunk_id == self.nbr_processes - 1:
+            chunk_size += self.nbr_seeds % self.nbr_processes
+
+        # Getting streamlines
+        for s in range(chunk_size):
+            if s % 1000 == 0:
+                logging.info(str(os.getpid()) + " : " + str(s)
+                             + " / " + str(chunk_size))
+
+            seed, stop_in_nuclei = self.seed_generator.get_next_pos(
+                random_generator, indices, first_seed_of_chunk + s, is_adaptative=True)
+            line = self._get_line_both_directions(seed, stop_in_nuclei)
+
+            if line is not None:
+                if self.compression_th and self.compression_th > 0:
+                    streamlines.append(
+                        compress_streamlines(np.array(line, dtype='float32'),
+                                             self.compression_th))
+                else:
+                    streamlines.append((np.array(line, dtype='float32')))
+
+                if self.save_seeds:
+                    seeds.append(np.asarray(seed, dtype='float32'))
+
+        return streamlines, seeds
+
+
+    def _get_line_both_directions(self, pos, stop_in_nuclei):
+        """
+        Generate a streamline from an initial position following the tracking
+        parameters.
+
+        Parameters
+        ----------
+        pos : tuple
+            3D position, the seed position.
+
+        Returns
+        -------
+        line: list of 3D positions
+        """
+
+        # toDo See numpy's doc: np.random.seed:
+        #  This is a convenience, legacy function.
+        #  The best practice is to not reseed a BitGenerator, rather to
+        #  recreate a new one. This method is here for legacy reasons.
+        np.random.seed(np.uint32(hash((pos, self.rng_seed))))
+        line = [pos]
+
+        # Initialize returns true if initial directions at pos are valid.
+        if self.propagator.initialize(pos, self.track_forward_only):
+            # Forward
+            forward = self._propagate_line(True, stop_in_nuclei)
+            if len(forward) > 0:
+                forward.pop(0)
+                line.extend(forward)
+
+            # Backward
+            if not self.track_forward_only:
+                # Depending on the propagator, adding possibility to reset some
+                # parameters at this point.
+                self.propagator.start_backward()
+
+                backward = self._propagate_line(False, stop_in_nuclei)
+                if len(backward) > 0:
+                    line.reverse()
+                    line.pop()
+                    line.extend(backward)
+
+            # Clean streamline
+            if self.min_nbr_pts <= len(line) <= self.max_nbr_pts:
+                return line
+            return None
+        elif self.min_nbr_pts == 1:
+            return [pos]
+        return None
+
+
+    def _propagate_line(self, is_forward, stop_in_nuclei):
+        """
+        Generate a streamline in forward or backward direction from an initial
+        position following the tracking parameters.
+
+        Propagation will stop if the current position is out of bounds (mask's
+        bounds and data's bounds should be the same) or if mask's value at
+        current position is 0 (usual use is with a binary mask but this is not
+        mandatory).
+
+        Returns
+        -------
+        line: list of 3D positions
+        """
+        line = [self.propagator.init_pos]
+        last_dir = self.propagator.forward_dir if is_forward else \
+            self.propagator.backward_dir
+
+        invalid_direction_count = 0
+
+        propagation_can_continue = True
+
+        # On selectionne le bon TissueConfigurator
+        id = int(self.mask.voxmm_to_value(*line[-1],
+                                          origin=self.origin))
+        tissue_config = get_tissue_configurator(self.config, id, stop_in_nuclei)
+
+        while len(line) < self.max_nbr_pts and propagation_can_continue:
+            # On update le propagateur.
+            self.propagator = tissue_config.updatePropagator(self.propagator)
+
+            new_pos, new_dir, is_valid_direction = self.propagator.propagate(
+                line[-1], last_dir)
+            line.append(new_pos)
+
+            if is_valid_direction:
+                invalid_direction_count = 0
+            else:
+                invalid_direction_count += 1
+
+            if invalid_direction_count > self.max_invalid_dirs:
+                propagation_can_continue = False
+                break
+
+            # We change the tissue type to check if we can continue
+            id = int(self.mask.voxmm_to_value(*line[-1],
+                                          origin=self.origin))
+            tissue_config = get_tissue_configurator(self.config, id, stop_in_nuclei)
+            propagation_can_continue = (tissue_config.can_continue(line, self.mask) and
+                                        self.mask.is_voxmm_in_bound(*line[-1],
+                                        origin=self.origin))
+            last_dir = new_dir
+
+        if tissue_config.is_valid_endpoint():
+            if is_valid_direction:
+                random.seed(np.uint32(hash((tuple(line[-1]), self.rng_seed))))
+                nb_ending_steps = tissue_config.max_nb_ending_steps
+                if tissue_config.max_nb_ending_steps:
+                    nb_ending_steps = random.randint(1, tissue_config.max_nb_ending_steps)
+                for i in range(nb_ending_steps):
+                    # Make a last step in the last direction
+                    # Ex: if mask is WM, reaching GM a little more.
+                    new_pos, new_dir, is_valid_direction = self.propagator.propagate(
+                        line[-1], last_dir)
+                    line.append(new_pos)
+                    last_dir = new_dir
+
+                    new_id = int(self.mask.voxmm_to_value(*line[-1],
+                                 origin=self.origin))
+                    if new_id != id:
+                        line.pop()
+                        break
+                    #On check si on est encore dans le meme tissue. Sinon on arrete et pop la dereniere ligne
+        else:
+            return []
+
+        # Last cleaning of the streamline
+        # First position is the seed: necessarily in bound.
+        while (len(line) > 1 and
+                not self.propagator.is_voxmm_in_bound(line[-1],
+                                                        origin=self.origin)):
             line.pop()
 
         return line
