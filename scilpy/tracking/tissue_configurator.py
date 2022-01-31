@@ -3,6 +3,7 @@
 import random
 
 import numpy as np
+from scipy.spatial import distance
 
 class TissueConfigurator(object):
     # Renomer stop_in_nuclei -> seed properties.
@@ -28,7 +29,10 @@ class TissueConfigurator(object):
         return True
 
     def is_valid_endpoint(self):
-        raise NotImplementedError
+        return False
+
+    def finalize_streamline(self, line, last_dir, tracker):
+        return []
 
 class BackgroundTissue(TissueConfigurator):
 
@@ -38,16 +42,10 @@ class BackgroundTissue(TissueConfigurator):
     def can_continue(self, line, mask):
         return False
 
-    def is_valid_endpoint(self):
-        return False
-
 class WmTissue(TissueConfigurator):
 
     def __init__(self, config, id, stop_in_nuclei):
         super().__init__(config, id)
-
-    def is_valid_endpoint(self):
-        return False
 
 class GmTissue(TissueConfigurator):
 
@@ -73,6 +71,28 @@ class GmTissue(TissueConfigurator):
 
     def is_valid_endpoint(self):
         return True
+
+    def finalize_streamline(self, line, last_dir, tracker):
+        if self.is_valid_endpoint():
+            random.seed(np.uint32(hash((tuple(line[-1]), tracker.rng_seed))))
+            nb_ending_steps = self.max_nb_ending_steps
+            if self.max_nb_ending_steps:
+                nb_ending_steps = random.randint(1, self.max_nb_ending_steps)
+            for i in range(nb_ending_steps):
+                # Make a last step in the last direction
+                # Ex: if mask is WM, reaching GM a little more.
+                new_pos, new_dir, _ = tracker.propagator.propagate(
+                    line[-1], last_dir)
+                line.append(new_pos)
+                last_dir = new_dir
+
+                new_id = int(tracker.mask.voxmm_to_value(*line[-1],
+                                origin=tracker.origin))
+                if new_id != id:
+                    line.pop()
+                    break
+        else:
+            return []
 
 class NucleiTissue(TissueConfigurator):
 
@@ -106,6 +126,29 @@ class NucleiTissue(TissueConfigurator):
         else:
             return False
 
+    def finalize_streamline(self, line, last_dir, tracker):
+        if self.is_valid_endpoint():
+            random.seed(np.uint32(hash((tuple(line[-1]), tracker.rng_seed))))
+            nb_ending_steps = self.max_nb_ending_steps
+            if self.max_nb_ending_steps:
+                nb_ending_steps = random.randint(1, self.max_nb_ending_steps)
+            for i in range(nb_ending_steps):
+                # Make a last step in the last direction
+                # Ex: if mask is WM, reaching GM a little more.
+                new_pos, new_dir, _ = tracker.propagator.propagate(
+                    line[-1], last_dir)
+                line.append(new_pos)
+                last_dir = new_dir
+
+                new_id = int(tracker.mask.voxmm_to_value(*line[-1],
+                                origin=tracker.origin))
+                if new_id != id:
+                    line.pop()
+                    return line
+            return line
+        else:
+            return []
+
 class CsfTissue(TissueConfigurator):
 
     def __init__(self, config, id, stop_in_nuclei):
@@ -128,9 +171,6 @@ class CsfTissue(TissueConfigurator):
             return True
         else:
             return False
-
-    def is_valid_endpoint(self):
-        return False
 
 class GmSurfaceTissue(TissueConfigurator):
 
@@ -157,12 +197,62 @@ class GmSurfaceTissue(TissueConfigurator):
     def is_valid_endpoint(self):
         return True
 
+    def finalize_streamline(self, line, last_dir, tracker):
+        if self.is_valid_endpoint():
+            vox_idx = tuple(tracker.mask.voxmm_to_idx(*line[-1], tracker.origin).astype(np.int))
+            normal_idx = get_closest_vertex(line[-1], vox_idx, tracker.vertices)
+            if normal_idx is not None:
+                last_dir = tracker.normals[vox_idx][normal_idx]
+                line.pop()
+            random.seed(np.uint32(hash((tuple(line[-1]), tracker.rng_seed))))
+            nb_ending_steps = self.max_nb_ending_steps
+            if self.max_nb_ending_steps:
+                nb_ending_steps = random.randint(1, self.max_nb_ending_steps)
+            for i in range(nb_ending_steps):
+                # Make a last step in the last direction
+                # Ex: if mask is WM, reaching GM a little more.
+                new_pos, new_dir, _ = tracker.propagator.propagate(
+                    line[-1], last_dir)
+                line.append(new_pos)
+                last_dir = new_dir
+
+                new_id = int(tracker.mask.voxmm_to_value(*line[-1],
+                                origin=tracker.origin))
+                if new_id != id:
+                    line.pop()
+                    return line
+            return line
+        else:
+            return []
+
 def get_tissue_configurator(config, id, stop_in_nuclei) -> TissueConfigurator:
     return tissue_dict[id](config, id, stop_in_nuclei)
 
+
+def support_surface(id) -> bool:
+    if id in [2]:
+        return True
+    return False
+
+def get_closest_vertex(pos, idx, vertices):
+    if idx in vertices:
+        #On prend le array de candidats
+        canditates = vertices[idx]
+        if len(canditates) > 1:
+            min_dist = 99
+            for id, i in enumerate(canditates):
+                cur_dist = distance.euclidean(pos, i)
+                if cur_dist < min_dist:
+                    min_dist = cur_dist
+                    min_idx = id
+            return min_idx
+        else:
+            return 0
+    return None
+
 tissue_dict = {0: BackgroundTissue,
                1: WmTissue,
-               2: GmTissue,
+               6: GmTissue,
                3: NucleiTissue,
                4: CsfTissue,
-               6: GmSurfaceTissue}
+               2: GmSurfaceTissue}
