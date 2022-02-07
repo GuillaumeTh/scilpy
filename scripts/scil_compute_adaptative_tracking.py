@@ -45,7 +45,7 @@ from scilpy.io.utils import (add_processes_arg, add_sphere_arg,
                              assert_inputs_exist, assert_outputs_exist,
                              verify_compression_th)
 from scilpy.image.datasets import DataVolume
-from scilpy.tracking.propagator import ODFPropagator
+from scilpy.tracking.propagator import DynamicODFPropagator, ODFPropagator
 from scilpy.tracking.seed import SeedGenerator
 from scilpy.tracking.tools import get_theta
 from scilpy.tracking.tracker import TissueTracker
@@ -65,20 +65,11 @@ def _build_arg_parser():
     p.add_argument('config', help='Config file')
 
     track_g = add_tracking_options(p)
-    track_g.add_argument('--algo', default='prob',
-                         choices=['det', 'prob'],
-                         help='Algorithm to use [%(default)s]')
     add_sphere_arg(track_g, symmetric_only=False)
     track_g.add_argument('--sfthres_init', metavar='sf_th', type=float,
                          default=0.5, dest='sf_threshold_init',
                          help="Spherical function relative threshold value "
                               "for the \ninitial direction. [%(default)s]")
-    track_g.add_argument('--rk_order', metavar="K", type=int, default=2,
-                         choices=[1, 2, 4],
-                         help="The order of the Runge-Kutta integration used "
-                              "for the \nstep function [%(default)s]. As a "
-                              "rule of thumb, doubling the rk_order \nwill "
-                              "double the computation time in the worst case.")
     track_g.add_argument('--max_invalid_length', metavar='MAX', type=float,
                          default=1,
                          help="Maximum length without valid direction, in mm. "
@@ -91,10 +82,12 @@ def _build_arg_parser():
                          choices=['nearest', 'trilinear'],
                          help="Spherical harmonic interpolation: "
                               "nearest-neighbor \nor trilinear. [%(default)s]")
-    track_g.add_argument('--mask_interp', default='trilinear',
+    track_g.add_argument('--mask_interp', default='nearest',
                          choices=['nearest', 'trilinear'],
                          help="Mask interpolation: nearest-neighbor or "
                               "trilinear. [%(default)s]")
+    track_g.add_argument('--percentage_stop', default=0.25,
+                         help='Percentage of seeds that can stop in nuclei [%(default)s]')
 
     add_seeding_options(p)
 
@@ -141,8 +134,6 @@ def main():
     verify_compression_th(args.compress)
     verify_seed_options(parser, args)
 
-    theta = gm.math.radians(get_theta(args.theta, args.algo))
-
     max_nbr_pts = int(args.max_length / args.step_size)
     min_nbr_pts = int(args.min_length / args.step_size) + 1
     max_invalid_dirs = int(math.ceil(args.max_invalid_length / args.step_size))
@@ -155,7 +146,7 @@ def main():
     seed_img = nib.load(args.in_seed)
     seed_data = seed_img.get_fdata(caching='unchanged', dtype=float)
     seed_res = seed_img.header.get_zooms()[:3]
-    seed_generator = SeedGenerator(seed_data, seed_res)
+    seed_generator = SeedGenerator(seed_data, seed_res, args.percentage_stop)
     if args.npv:
         # toDo. This will not really produce n seeds per voxel, only true
         #  in average.
@@ -186,9 +177,12 @@ def main():
         config = ast.literal_eval(config_file.read())
 
     logging.debug("Instantiating propagator.")
-    propagator = ODFPropagator(
-        dataset, args.step_size, args.rk_order, args.algo, args.sh_basis,
-        args.sf_threshold, args.sf_threshold_init, theta, args.sphere)
+    # propagator = ODFPropagator(
+    #     dataset, args.step_size, args.rk_order, args.algo, args.sh_basis,
+    #     args.sf_threshold, args.sf_threshold_init, theta, args.sphere)
+    propagator = DynamicODFPropagator(
+        dataset, args.sh_basis,
+        args.sf_threshold, args.sf_threshold_init, args.sphere)
 
     tracker = TissueTracker(propagator, mask, seed_generator, config, nbr_seeds, min_nbr_pts,
                       max_nbr_pts, max_invalid_dirs, args.compress,

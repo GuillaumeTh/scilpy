@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
 from enum import Enum
+import os
+import functools
 
 import dipy
+import nibabel as nib
 import numpy as np
+import dipy.core.geometry as gm
 from dipy.reconst.shm import order_from_ncoef, sh_to_sf_matrix
+from sqlalchemy import false
 
 from scilpy.reconst.utils import get_sphere_neighbours
 from scilpy.tracking.tools import sample_distribution
@@ -395,9 +400,9 @@ class ODFPropagator(PropagatorOnSphere):
         sh = self.dataset.voxmm_to_value(*pos, self.origin)
         sf = np.dot(self.B.T, sh).reshape((-1, 1))
 
-        sf_max = np.max(sf)
+        sf_max = sf.max()
         if sf_max > 0:
-            sf /= sf_max
+            return sf / sf_max
         return sf
 
     def prepare_forward(self, seeding_pos):
@@ -530,6 +535,76 @@ class ODFPropagator(PropagatorOnSphere):
         maxima = []
         for i in np.nonzero(self.tracking_neighbours[
                                 previous_direction.index])[0]:
-            if 0 < sf[i] == np.max(sf[self.maxima_neighbours[i]]):
+            if 0 < sf[i] == sf[self.maxima_neighbours[i]].max():
                 maxima.append(self.dirs[i])
         return maxima
+
+
+class DynamicODFPropagator(ODFPropagator):
+    """
+    Propagator on ODFs/fODFs. Algo can be det or prob.
+    """
+    def __init__(self, dataset, basis, sf_threshold, sf_threshold_init,
+                 dipy_sphere='symmetric724',
+                 min_separation_angle=np.pi / 16.):
+        """
+
+        Parameters
+        ----------
+        dataset: scilpy.image.datasets.DataVolume
+            Trackable Dataset object.
+        dipy_sphere: string, optional
+            If necessary, name of the DIPY sphere object to use to evaluate
+            directions.
+        basis: string
+            SH basis name. One of 'tournier07' or 'descoteaux07'
+        sf_threshold: float
+            Threshold on spherical function (SF).
+        sf_threshold_init: float
+            Threshold on spherical function when initializing a new streamline.
+        dipy_sphere: string, optional
+            Name of the DIPY sphere object to use for evaluating SH. Can't be
+            None.
+        min_separation_angle: float, optional
+            Minimum separation angle (in radians) for peaks extraction. Used
+            for deterministic tracking. A candidate direction is a maximum if
+            its SF value is greater than all other SF values in its
+            neighbourhood, where the neighbourhood includes all the sphere
+            directions located at most `min_separation_angle` from the
+            candidate direction.
+        """
+        
+        super().__init__(dataset, 0.5,
+                 2, 'prob', basis, sf_threshold, sf_threshold_init,
+                 gm.math.radians(20), dipy_sphere,
+                 min_separation_angle)
+        
+        self.theta = None
+        self.neighbours_dict = None
+        self.tracking_neighbours = None
+        self.algo = None
+        self.step_size = None
+        self.rk_order = None
+
+    def update_propagator(self, theta=False, step_size=False, algo=False, rk_order=False):
+        if theta:
+            self.theta = gm.math.radians(theta)
+            if self.neighbours_dict is None:
+                self.neighbours_dict = {}
+            if int(theta) in self.neighbours_dict:
+                self.tracking_neighbours = self.neighbours_dict[int(theta)]
+            else:
+                self.neighbours_dict[int(theta)] = get_sphere_neighbours(self.sphere,
+                                                                         self.theta)
+                self.tracking_neighbours = self.neighbours_dict[int(theta)]
+        if step_size:
+            self.step_size = step_size
+        if algo:
+            if algo not in ['det', 'prob']:
+                raise ValueError("ODFPropagator algo should be 'det' or 'prob'.")
+            self.algo = algo
+        if rk_order:
+            if not (rk_order == 1 or rk_order == 2 or rk_order == 4):
+                raise ValueError("Invalid runge-kutta order. Is " +
+                                    str(rk_order) + ". Choices : 1, 2, 4")
+            self.rk_order = rk_order

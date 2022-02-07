@@ -16,7 +16,7 @@ class SeedGenerator(object):
     example as above, seed sampled in voxel i,j,k = (0,1,2) will be somewhere
     in the range x = [0, 3], y = [3, 6], z = [6, 9].
     """
-    def __init__(self, data, voxres):
+    def __init__(self, data, voxres, percentage_stop = 0.25):
         """
         Parameters
         ----------
@@ -27,7 +27,7 @@ class SeedGenerator(object):
         """
         self.data = data
         self.voxres = voxres
-        self.percentage_stop = 0.3
+        self.percentage_stop = percentage_stop
 
         # Everything scilpy.tracking is in 'corner', 'voxmm'
         self.origin = 'corner'

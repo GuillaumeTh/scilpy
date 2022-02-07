@@ -126,12 +126,12 @@ class Tracker(object):
 
                 lines_per_process, seeds_per_process = zip(*pool.map(
                     self._get_streamlines_sub, chunk_ids))
-                pool.close()
-                # Make sure all worker processes have exited before leaving
-                # context manager.
-                pool.join()
-                lines = [line for line in itertools.chain(*lines_per_process)]
-                seeds = [seed for seed in itertools.chain(*seeds_per_process)]
+            pool.close()
+            # Make sure all worker processes have exited before leaving
+            # context manager.
+            pool.join()
+            lines = [line for line in itertools.chain(*lines_per_process)]
+            seeds = [seed for seed in itertools.chain(*seeds_per_process)]
 
         return lines, seeds
 
@@ -405,14 +405,19 @@ class TissueTracker(Tracker):
 
 
     def init_surfaces(self):
-        logging.debug(str(os.getpid()) + " : Prepare surface")
+        from trimeshpy import trimesh_vtk
         normals_per_vox = {}
         vertices_per_vox = {}
         for i in self.labels:
             if tissue_configurator.support_surface(i):
+                logging.debug(str(os.getpid()) + " : Prepare surface")
                 mask = np.ones(self.mask.data.squeeze().shape)
                 mask[self.mask.data.squeeze() != i] = 0
-                verts, _, normals, _ = marching_cubes(mask, allow_degenerate=False)
+                verts, triangle, normals, _ = marching_cubes(mask, allow_degenerate=False)
+                tri = trimesh_vtk.TriMesh_Vtk(triangle, verts)
+                tri.update_normals()
+                normals = tri.get_normals()
+                # print(len(tri.get_normals()), len(normals), normals[0])
                 for v, n in zip(verts, normals):
                     idx = tuple(v.astype(np.int))
                     if idx not in vertices_per_vox:
@@ -512,7 +517,7 @@ class TissueTracker(Tracker):
 
         # Backward
         if not self.track_forward_only and len(line) > 1:
-
+            line.reverse()
             tracking_info = self.propagator.prepare_backward(line,
                                                              tracking_info)
             line = self._propagate_line(line, tracking_info, stop_in_nuclei)
@@ -553,14 +558,11 @@ class TissueTracker(Tracker):
         propagation_can_continue = True
 
         # On selectionne le bon TissueConfigurator
-        id = int(self.mask.voxmm_to_value(*line[-1],
+        tissue_id = int(self.mask.voxmm_to_value(*line[-1],
                                           origin=self.origin))
-        tissue_config = get_tissue_configurator(self.config, id, stop_in_nuclei)
-
+        tissue_config = get_tissue_configurator(self.config, tissue_id, stop_in_nuclei)
+        self.propagator = tissue_config.updatePropagator(self.propagator)
         while len(line) < self.max_nbr_pts and propagation_can_continue:
-            # On update le propagateur.
-            self.propagator = tissue_config.updatePropagator(self.propagator)
-
             new_pos, new_dir, is_valid_direction = self.propagator.propagate(
                 line[-1], last_dir)
             line.append(new_pos)
@@ -575,14 +577,17 @@ class TissueTracker(Tracker):
                 break
 
             # We change the tissue type to check if we can continue
-            id = int(self.mask.voxmm_to_value(*line[-1],
-                                          origin=self.origin))
-            tissue_config = get_tissue_configurator(self.config, id, stop_in_nuclei)
+            last_id = tissue_id
+            tissue_id = int(self.mask.voxmm_to_value(*line[-1],
+                                              origin=self.origin))
+            tissue_config = get_tissue_configurator(self.config, tissue_id, stop_in_nuclei)
+            if last_id != tissue_id:
+                # On update le propagateur.
+                self.propagator = tissue_config.updatePropagator(self.propagator)
             propagation_can_continue = (tissue_config.can_continue(line, self.mask) and
                                         self.mask.is_voxmm_in_bound(*line[-1],
                                         origin=self.origin))
             last_dir = new_dir
-
         line = tissue_config.finalize_streamline(line, last_dir, self)
         # if tissue_config.is_valid_endpoint():
         #     if is_valid_direction:
@@ -613,5 +618,11 @@ class TissueTracker(Tracker):
                 not self.propagator.is_voxmm_in_bound(line[-1],
                                                         origin=self.origin)):
             line.pop()
-
-        return line
+        
+        if len(line) > 1:
+            tissue_id = int(self.mask.voxmm_to_value(*line[-1],
+                                                    origin=self.origin))
+            tissue_config = get_tissue_configurator(self.config, tissue_id, stop_in_nuclei)
+            if tissue_config.is_valid_endpoint():
+                return line
+        return []

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
+from math import remainder
 import numpy as np
 
 from dipy.core.interpolation import trilinear_interpolate4d, \
     nearestneighbor_interpolate
 
-
+import torch
 class DataVolume(object):
     """
     Class to access/interpolate data from nibabel object
@@ -126,17 +127,9 @@ class DataVolume(object):
         out: list
             Voxel space coordinates for position x, y, z.
         """
-        if origin == 'center':
-            half_res = self.voxres / 2.
-            return [(x + half_res[0]) / self.voxres[0],
-                    (y + half_res[1]) / self.voxres[1],
-                    (z + half_res[2]) / self.voxres[2]]
-        elif origin == 'corner':
-            return [x / self.voxres[0],
-                    y / self.voxres[1],
-                    z / self.voxres[2]]
-        else:
-            raise ValueError("Origin should be 'center' or 'corner'.")
+        return [x / self.voxres[0],
+                y / self.voxres[1],
+                z / self.voxres[2]]
 
     def voxmm_to_value(self, x, y, z, origin, interpolator=None):
         """
@@ -160,27 +153,16 @@ class DataVolume(object):
             is of length 1, return a scalar value.
         """
         if self.interpolation is not None or interpolator is not None:
-            if not self.is_voxmm_in_bound(x, y, z, origin):
-                eps = float(1e-8)  # Epsilon to exclude upper borders
-                if origin == 'corner':
-                    x = max(0,
-                            min(self.voxres[0] * (self.dim[0] - eps), x))
-                    y = max(0,
-                            min(self.voxres[1] * (self.dim[1] - eps), y))
-                    z = max(0,
-                            min(self.voxres[2] * (self.dim[2] - eps), z))
-                elif origin == 'center':
-                    x = max(-self.voxres[0] / 2,
-                            min(self.voxres[0] * (self.dim[0] - 0.5 - eps), x))
-                    y = max(-self.voxres[1] / 2,
-                            min(self.voxres[1] * (self.dim[1] - 0.5 - eps), y))
-                    z = max(-self.voxres[2] / 2,
-                            min(self.voxres[2] * (self.dim[2] - 0.5 - eps), z))
-                else:
-                    raise ValueError("Origin should be 'center' or 'corner'.")
+            eps = float(1e-8)  # Epsilon to exclude upper borders
+            x = max(0,
+                    min(self.voxres[0] * (self.dim[0] - eps), x))
+            y = max(0,
+                    min(self.voxres[1] * (self.dim[1] - eps), y))
+            z = max(0,
+                    min(self.voxres[2] * (self.dim[2] - eps), z))
 
             coord = np.array(self.voxmm_to_vox(x, y, z, origin),
-                             dtype=np.float64)
+                            dtype=np.float64) - 0.5
 
             # Interpolation: Using dipy's pyx methods. The doc can be found in
             # the file dipy.core.interpolation.pxd. Dipy works with origin
@@ -188,12 +170,11 @@ class DataVolume(object):
             curr_interp = self.interpolation
             if interpolator is not None:
                 curr_interp = interpolator
-            if origin == 'corner':
-                coord -= 0.5
             if curr_interp == 'nearest':
                 # They use round(point), not floor. This is the equivalent of
                 # origin = 'center'.
-                result = nearestneighbor_interpolate(self.data, coord)
+                result = self.data[tuple(coord.round().astype(np.int16))]
+                # result = nearestneighbor_interpolate(self.data, coord)
             else:
                 # Trilinear
                 # They do not say it explicitely but they verify if
@@ -203,7 +184,7 @@ class DataVolume(object):
 
             # Squeezing returns only value instead of array of length 1 if 3D
             # data
-            return np.squeeze(result)
+            return result.squeeze()
         else:
             raise Exception("No interpolation method was given, cannot run "
                             "this method..")

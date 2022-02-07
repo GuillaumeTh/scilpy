@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import random
+import os
 
 import numpy as np
 from scipy.spatial import distance
@@ -11,6 +12,8 @@ class TissueConfigurator(object):
         self.id = id
         self.theta = config[id]["theta"]
         self.step_size = config[id]["step_size"]
+        self.algo = config[id]["algo"]
+        self.rk_order = config[id]["rk_order"]
         self.stop_in_nuclei = stop_in_nuclei
         if "max_nb_ending_steps" in config[id]:
             self.max_nb_ending_steps = config[id]["max_nb_ending_steps"]
@@ -23,6 +26,10 @@ class TissueConfigurator(object):
             self.max_consecutive_steps = 1
 
     def updatePropagator(self, propagator):
+        propagator.update_propagator(step_size = self.step_size,
+                                     theta = self.theta,
+                                     algo = self.algo,
+                                     rk_order = self.rk_order)
         return propagator
 
     def can_continue(self, line, mask):
@@ -91,6 +98,7 @@ class GmTissue(TissueConfigurator):
                 if new_id != id:
                     line.pop()
                     break
+            return line
         else:
             return []
 
@@ -166,7 +174,6 @@ class CsfTissue(TissueConfigurator):
                                     origin='corner', interpolator="trilinear")
         difference = value / self.id
         rand_value = random.random()
-        # print(rand_value, difference, value, self.id, *line[-1])
         if rand_value < difference:
             return True
         else:
@@ -199,38 +206,43 @@ class GmSurfaceTissue(TissueConfigurator):
 
     def finalize_streamline(self, line, last_dir, tracker):
         if self.is_valid_endpoint():
+            random.seed(np.uint32(hash((tuple(line[-1]), tracker.rng_seed))))
+            if self.max_nb_ending_steps:
+                nb_ending_steps = random.randint(1, self.max_nb_ending_steps)
+            else:
+                nb_ending_steps = 1
             vox_idx = tuple(tracker.mask.voxmm_to_idx(*line[-1], tracker.origin).astype(np.int))
             normal_idx = get_closest_vertex(line[-1], vox_idx, tracker.vertices)
             if normal_idx is not None:
-                last_dir = tracker.normals[vox_idx][normal_idx]
-                line.pop()
-            random.seed(np.uint32(hash((tuple(line[-1]), tracker.rng_seed))))
-            nb_ending_steps = self.max_nb_ending_steps
-            if self.max_nb_ending_steps:
-                nb_ending_steps = random.randint(1, self.max_nb_ending_steps)
-            for i in range(nb_ending_steps):
-                # Make a last step in the last direction
-                # Ex: if mask is WM, reaching GM a little more.
-                new_pos, new_dir, _ = tracker.propagator.propagate(
-                    line[-1], last_dir)
-                line.append(new_pos)
-                last_dir = new_dir
-
-                new_id = int(tracker.mask.voxmm_to_value(*line[-1],
-                                origin=tracker.origin))
-                if new_id != id:
+                last_dir = -1 * tracker.normals[vox_idx][normal_idx]
+                count = 0
+                while len(line) > 1 and count < 3:
                     line.pop()
-                    return line
-            return line
-        else:
-            return []
+                    count += 1
+                for _ in range(count):
+                    # Make a last step in the last direction
+                    # Ex: if mask is WM, reaching GM a little more.
+                    new_pos = line[-1] + self.step_size * np.array(last_dir)
+                    # new_pos, new_dir, _ = tracker.propagator.propagate(
+                    #     line[-1], np.array(last_dir))
+                    line.append(new_pos)
+                    # last_dir = last_dir
+
+                    new_id = int(tracker.mask.voxmm_to_value(*line[-1],
+                                    origin=tracker.origin))
+                    if new_id != self.id:
+                        line.pop()
+                        return line
+                return line
+            else:
+                return []
 
 def get_tissue_configurator(config, id, stop_in_nuclei) -> TissueConfigurator:
     return tissue_dict[id](config, id, stop_in_nuclei)
 
 
 def support_surface(id) -> bool:
-    if id in [2]:
+    if id in [6]:
         return True
     return False
 
@@ -252,7 +264,7 @@ def get_closest_vertex(pos, idx, vertices):
 
 tissue_dict = {0: BackgroundTissue,
                1: WmTissue,
-               6: GmTissue,
+               2: GmTissue,
                3: NucleiTissue,
                4: CsfTissue,
-               2: GmSurfaceTissue}
+               6: GmSurfaceTissue}
