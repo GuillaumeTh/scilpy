@@ -24,7 +24,9 @@ def get_extensions():
                                    ['scilpy/tractanalysis/grid_intersections.pyx'])
     streamlines_metrics = Extension('scilpy.tractanalysis.streamlines_metrics',
                                     ['scilpy/tractanalysis/streamlines_metrics.pyx'])
-    return [uncompress, quick_tools, grid_intersections, streamlines_metrics]
+    utils_c = Extension('scilpy.image.utils_c',
+                                    ['scilpy/image/utils_c.pyx'])
+    return [uncompress, quick_tools, grid_intersections, streamlines_metrics, utils_c]
 
 
 class CustomBuildExtCommand(build_ext):

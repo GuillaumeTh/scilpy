@@ -1,14 +1,10 @@
 # -*- coding: utf-8 -*-
 from enum import Enum
-import os
-import functools
 
 import dipy
-import nibabel as nib
 import numpy as np
 import dipy.core.geometry as gm
 from dipy.reconst.shm import order_from_ncoef, sh_to_sf_matrix
-from sqlalchemy import false
 
 from scilpy.reconst.utils import get_sphere_neighbours
 from scilpy.tracking.tools import sample_distribution
@@ -400,9 +396,9 @@ class ODFPropagator(PropagatorOnSphere):
         sh = self.dataset.voxmm_to_value(*pos, self.origin)
         sf = np.dot(self.B.T, sh).reshape((-1, 1))
 
-        sf_max = sf.max()
+        sf_max = np.max(sf)
         if sf_max > 0:
-            return sf / sf_max
+             sf /= sf_max
         return sf
 
     def prepare_forward(self, seeding_pos):
@@ -535,7 +531,7 @@ class ODFPropagator(PropagatorOnSphere):
         maxima = []
         for i in np.nonzero(self.tracking_neighbours[
                                 previous_direction.index])[0]:
-            if 0 < sf[i] == sf[self.maxima_neighbours[i]].max():
+            if 0 < sf[i] == np.max(sf[self.maxima_neighbours[i]]):
                 maxima.append(self.dirs[i])
         return maxima
 
