@@ -89,6 +89,12 @@ def main():
         for sub in subj:
             if b_name not in report_dict:
                 report_dict[b_name] = {}
+
+            if b_name+"_L" not in report_dict:
+                report_dict[b_name+"_L"] = {}
+            if b_name+"_R" not in report_dict:
+                report_dict[b_name+"_R"] = {}
+
             if sub in report_dict[b_name+"_L"] and sub in report_dict[b_name+"_R"]:
                 left = report_dict[b_name+"_L"][sub]["status"]
                 right = report_dict[b_name+"_R"][sub]["status"]
