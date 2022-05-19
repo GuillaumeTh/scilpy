@@ -111,7 +111,7 @@ def main():
     include_map += gm_pve
     exclude_map += ventricules_pve
 
-    exclude_map[exclude_map < 0.5] = 0
+    exclude_map[exclude_map < 0.05] = 0
     include_map[background > 0.5] = 1
 
     exclude_map = np.clip(exclude_map, 0, 1)
@@ -127,7 +127,7 @@ def main():
 
     include_map[include_map < 0.05] = 0
     exclude_map[exclude_map < 0.05] = 0
-    exclude_map[exclude_map > 0.5] = 1
+    # exclude_map[exclude_map > 0.5] = 1
 
     nib.Nifti1Image(include_map.astype('float32'),
                     segmentation_img.affine).to_filename(args.include)
