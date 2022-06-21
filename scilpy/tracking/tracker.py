@@ -24,11 +24,23 @@ data_file_info = None
 
 
 class Tracker(object):
-    def __init__(self, propagator: AbstractPropagator, mask: DataVolume,
-                 seed_generator: SeedGenerator, nbr_seeds, min_nbr_pts,
-                 max_nbr_pts, max_invalid_dirs, compression_th=0.1,
-                 nbr_processes=1, save_seeds=False, mmap_mode=None,
-                 rng_seed=1234, track_forward_only=False, skip=0):
+    def __init__(
+        self,
+        propagator: AbstractPropagator,
+        mask: DataVolume,
+        seed_generator: SeedGenerator,
+        nbr_seeds,
+        min_nbr_pts,
+        max_nbr_pts,
+        max_invalid_dirs,
+        compression_th=0.1,
+        nbr_processes=1,
+        save_seeds=False,
+        mmap_mode=None,
+        rng_seed=1234,
+        track_forward_only=False,
+        skip=0,
+    ):
         """
         Parameters
         ----------
@@ -80,12 +92,11 @@ class Tracker(object):
         self.skip = skip
 
         # Everything scilpy.tracking is in 'corner', 'voxmm'
-        self.origin = 'corner'
-        self.space = 'voxmm'
+        self.origin = "corner"
+        self.space = "voxmm"
 
         if self.min_nbr_pts <= 0:
-            logging.warning("Minimum number of points cannot be 0. Changed to "
-                            "1.")
+            logging.warning("Minimum number of points cannot be 0. Changed to " "1.")
             self.min_nbr_pts = 1
 
         self.nbr_processes = self._set_nbr_processes(nbr_processes)
@@ -110,7 +121,7 @@ class Tracker(object):
                 # toDo
                 # must be better designed for dipy
                 # the tracking should not know which data to deal with
-                data_file_name = os.path.join(tmpdir, 'data.npy')
+                data_file_name = os.path.join(tmpdir, "data.npy")
                 np.save(data_file_name, self.propagator.dataset.data)
                 self.propagator.reset_data()
 
@@ -119,13 +130,15 @@ class Tracker(object):
                 # doing manually with a static class.
                 # Be careful however, parameter changes inside the method will
                 # not be kept.
-                pool = multiprocessing.Pool(self.nbr_processes,
-                                            initializer=self._init_sub_process,
-                                            initargs=(data_file_name,
-                                                      self.mmap_mode))
+                pool = multiprocessing.Pool(
+                    self.nbr_processes,
+                    initializer=self._init_sub_process,
+                    initargs=(data_file_name, self.mmap_mode),
+                )
 
-                lines_per_process, seeds_per_process = zip(*pool.map(
-                    self._get_streamlines_sub, chunk_ids))
+                lines_per_process, seeds_per_process = zip(
+                    *pool.map(self._get_streamlines_sub, chunk_ids)
+                )
             pool.close()
             # Make sure all worker processes have exited before leaving
             # context manager.
@@ -141,14 +154,17 @@ class Tracker(object):
             try:
                 nbr_processes = multiprocessing.cpu_count()
             except NotImplementedError:
-                logging.warning("Cannot determine number of cpus: "
-                                "nbr_processes set to 1.")
+                logging.warning(
+                    "Cannot determine number of cpus: " "nbr_processes set to 1."
+                )
                 nbr_processes = 1
 
         if nbr_processes > self.nbr_seeds:
             nbr_processes = self.nbr_seeds
-            logging.debug("Setting number of processes to {} since there were "
-                          "less seeds than processes.".format(nbr_processes))
+            logging.debug(
+                "Setting number of processes to {} since there were "
+                "less seeds than processes.".format(nbr_processes)
+            )
         return nbr_processes
 
     @staticmethod
@@ -171,8 +187,9 @@ class Tracker(object):
         """
         global data_file_info
 
-        self.propagator.reset_data(np.load(
-            data_file_info[0], mmap_mode=data_file_info[1]))
+        self.propagator.reset_data(
+            np.load(data_file_info[0], mmap_mode=data_file_info[1])
+        )
 
         try:
             streamlines, seeds = self._get_streamlines(chunk_id)
@@ -210,18 +227,21 @@ class Tracker(object):
         chunk_size = int(self.nbr_seeds / self.nbr_processes)
         first_seed_of_chunk = chunk_id * chunk_size + self.skip
         random_generator, indices = self.seed_generator.init_generator(
-            self.rng_seed, first_seed_of_chunk)
+            self.rng_seed, first_seed_of_chunk
+        )
         if chunk_id == self.nbr_processes - 1:
             chunk_size += self.nbr_seeds % self.nbr_processes
 
         # Getting streamlines
         for s in range(chunk_size):
             if s % 1000 == 0:
-                logging.info(str(os.getpid()) + " : " + str(s)
-                             + " / " + str(chunk_size))
+                logging.info(
+                    str(os.getpid()) + " : " + str(s) + " / " + str(chunk_size)
+                )
 
             seed = self.seed_generator.get_next_pos(
-                random_generator, indices, first_seed_of_chunk + s)
+                random_generator, indices, first_seed_of_chunk + s
+            )
 
             # Forward and backward tracking
             line = self._get_line_both_directions(seed)
@@ -229,13 +249,15 @@ class Tracker(object):
             if line is not None:
                 if self.compression_th and self.compression_th > 0:
                     streamlines.append(
-                        compress_streamlines(np.array(line, dtype='float32'),
-                                             self.compression_th))
+                        compress_streamlines(
+                            np.array(line, dtype="float32"), self.compression_th
+                        )
+                    )
                 else:
-                    streamlines.append((np.array(line, dtype='float32')))
+                    streamlines.append((np.array(line, dtype="float32")))
 
                 if self.save_seeds:
-                    seeds.append(np.asarray(seed, dtype='float32'))
+                    seeds.append(np.asarray(seed, dtype="float32"))
         return streamlines, seeds
 
     def _get_line_both_directions(self, seeding_pos):
@@ -272,8 +294,7 @@ class Tracker(object):
             if len(line) > 1:
                 line.reverse()
 
-            tracking_info = self.propagator.prepare_backward(line,
-                                                             tracking_info)
+            tracking_info = self.propagator.prepare_backward(line, tracking_info)
             line = self._propagate_line(line, tracking_info)
 
         # Clean streamline
@@ -310,8 +331,9 @@ class Tracker(object):
         invalid_direction_count = 0
         propagation_can_continue = True
         while len(line) < self.max_nbr_pts and propagation_can_continue:
-            new_pos, new_tracking_info, is_direction_valid = \
-                self.propagator.propagate(line[-1], tracking_info)
+            new_pos, new_tracking_info, is_direction_valid = self.propagator.propagate(
+                line[-1], tracking_info
+            )
 
             # Verifying and appending
             if is_direction_valid:
@@ -319,18 +341,20 @@ class Tracker(object):
             else:
                 invalid_direction_count += 1
             propagation_can_continue = self._verify_stopping_criteria(
-                invalid_direction_count, new_pos)
+                invalid_direction_count, new_pos
+            )
             if propagation_can_continue:
                 line.append(new_pos)
 
             tracking_info = new_tracking_info
 
         # Possible last step.
-        final_pos = self.propagator.finalize_streamline(line[-1],
-                                                        tracking_info)
-        if (final_pos is not None and
-                not np.array_equal(final_pos, line[-1]) and
-                self.mask.is_voxmm_in_bound(*final_pos, origin=self.origin)):
+        final_pos = self.propagator.finalize_streamline(line[-1], tracking_info)
+        if (
+            final_pos is not None
+            and not np.array_equal(final_pos, line[-1])
+            and self.mask.is_voxmm_in_bound(*final_pos, origin=self.origin)
+        ):
             line.append(final_pos)
         return line
 
@@ -338,7 +362,7 @@ class Tracker(object):
         # Checking number of consecutive invalid directions
         if invalid_direction_count > self.max_invalid_dirs:
             return False
-        
+
         # Checking if out of bound
         if not self.mask.is_voxmm_in_bound(*last_pos, origin=self.origin):
             return False
@@ -349,13 +373,26 @@ class Tracker(object):
 
         return True
 
-class TissueTracker(Tracker):
 
-    def __init__(self, propagator: AbstractPropagator, mask: DataVolume,
-                 seed_generator: SeedGenerator, config, nbr_seeds, min_nbr_pts,
-                 max_nbr_pts, max_invalid_dirs, compression_th=0.1,
-                 nbr_processes=1, save_seeds=False, mmap_mode=None,
-                 rng_seed=1234, track_forward_only=False, skip=0):
+class TissueTracker(Tracker):
+    def __init__(
+        self,
+        propagator: AbstractPropagator,
+        mask: DataVolume,
+        seed_generator: SeedGenerator,
+        config,
+        nbr_seeds,
+        min_nbr_pts,
+        max_nbr_pts,
+        max_invalid_dirs,
+        compression_th=0.1,
+        nbr_processes=1,
+        save_seeds=False,
+        mmap_mode=None,
+        rng_seed=1234,
+        track_forward_only=False,
+        skip=0,
+    ):
         """
         Parameters
         ----------
@@ -394,18 +431,30 @@ class TissueTracker(Tracker):
             with nbr_seeds=1,000,000, you can create tractogram_2 with
             skip 1,000,000.
         """
-        super().__init__(propagator, mask,
-                         seed_generator, nbr_seeds, min_nbr_pts,
-                         max_nbr_pts, max_invalid_dirs, compression_th,
-                         nbr_processes, save_seeds, mmap_mode,
-                         rng_seed, track_forward_only, skip)
-        
+        super().__init__(
+            propagator,
+            mask,
+            seed_generator,
+            nbr_seeds,
+            min_nbr_pts,
+            max_nbr_pts,
+            max_invalid_dirs,
+            compression_th,
+            nbr_processes,
+            save_seeds,
+            mmap_mode,
+            rng_seed,
+            track_forward_only,
+            skip,
+        )
+
         self.config = config
         self.labels = np.unique(mask.data)
 
-
+    # It is a first try. Issues on the normal.
     def init_surfaces(self):
         from trimeshpy import trimesh_vtk
+
         normals_per_vox = {}
         vertices_per_vox = {}
         for i in self.labels:
@@ -413,7 +462,9 @@ class TissueTracker(Tracker):
                 logging.debug(str(os.getpid()) + " : Prepare surface")
                 mask = np.ones(self.mask.data.squeeze().shape)
                 mask[self.mask.data.squeeze() != i] = 0
-                verts, triangle, normals, _ = marching_cubes(mask, allow_degenerate=False)
+                verts, triangle, normals, _ = marching_cubes(
+                    mask, allow_degenerate=False
+                )
                 tri = trimesh_vtk.TriMesh_Vtk(triangle, verts)
                 tri.update_normals()
                 normals = tri.get_normals()
@@ -427,7 +478,6 @@ class TissueTracker(Tracker):
                     vertices_per_vox[idx].append(v)
                 return normals_per_vox, vertices_per_vox
         return None, None
-
 
     def _get_streamlines(self, chunk_id):
         """
@@ -458,33 +508,37 @@ class TissueTracker(Tracker):
         chunk_size = int(self.nbr_seeds / self.nbr_processes)
         first_seed_of_chunk = chunk_id * chunk_size + self.skip
         random_generator, indices = self.seed_generator.init_generator(
-            self.rng_seed, first_seed_of_chunk)
+            self.rng_seed, first_seed_of_chunk
+        )
         if chunk_id == self.nbr_processes - 1:
             chunk_size += self.nbr_seeds % self.nbr_processes
 
         # Getting streamlines
         for s in range(chunk_size):
             if s % 1000 == 0:
-                logging.info(str(os.getpid()) + " : " + str(s)
-                             + " / " + str(chunk_size))
+                logging.info(
+                    str(os.getpid()) + " : " + str(s) + " / " + str(chunk_size)
+                )
 
             seed, stop_in_nuclei = self.seed_generator.get_next_pos(
-                random_generator, indices, first_seed_of_chunk + s, is_adaptative=True)
+                random_generator, indices, first_seed_of_chunk + s, is_adaptative=True
+            )
             line = self._get_line_both_directions(seed, stop_in_nuclei)
 
             if line is not None:
                 if self.compression_th and self.compression_th > 0:
                     streamlines.append(
-                        compress_streamlines(np.array(line, dtype='float32'),
-                                             self.compression_th))
+                        compress_streamlines(
+                            np.array(line, dtype="float32"), self.compression_th
+                        )
+                    )
                 else:
-                    streamlines.append((np.array(line, dtype='float32')))
+                    streamlines.append((np.array(line, dtype="float32")))
 
                 if self.save_seeds:
-                    seeds.append(np.asarray(seed, dtype='float32'))
+                    seeds.append(np.asarray(seed, dtype="float32"))
 
         return streamlines, seeds
-
 
     def _get_line_both_directions(self, seeding_pos, stop_in_nuclei):
         """
@@ -518,15 +572,13 @@ class TissueTracker(Tracker):
         # Backward
         if not self.track_forward_only and len(line) > 1:
             line.reverse()
-            tracking_info = self.propagator.prepare_backward(line,
-                                                             tracking_info)
+            tracking_info = self.propagator.prepare_backward(line, tracking_info)
             line = self._propagate_line(line, tracking_info, stop_in_nuclei)
 
         # Clean streamline
         if self.min_nbr_pts <= len(line) <= self.max_nbr_pts:
             return line
         return None
-
 
     def _propagate_line(self, line, last_dir, stop_in_nuclei):
         """
@@ -558,13 +610,13 @@ class TissueTracker(Tracker):
         propagation_can_continue = True
 
         # On selectionne le bon TissueConfigurator
-        tissue_id = int(self.mask.voxmm_to_value(*line[-1],
-                                          origin=self.origin))
+        tissue_id = int(self.mask.voxmm_to_value(*line[-1], origin=self.origin))
         tissue_config = get_tissue_configurator(self.config, tissue_id, stop_in_nuclei)
         self.propagator = tissue_config.updatePropagator(self.propagator)
         while len(line) < self.max_nbr_pts and propagation_can_continue:
             new_pos, new_dir, is_valid_direction = self.propagator.propagate(
-                line[-1], last_dir)
+                line[-1], last_dir
+            )
             line.append(new_pos)
 
             if is_valid_direction:
@@ -578,15 +630,16 @@ class TissueTracker(Tracker):
 
             # We change the tissue type to check if we can continue
             last_id = tissue_id
-            tissue_id = int(self.mask.voxmm_to_value(*line[-1],
-                                              origin=self.origin))
-            tissue_config = get_tissue_configurator(self.config, tissue_id, stop_in_nuclei)
+            tissue_id = int(self.mask.voxmm_to_value(*line[-1], origin=self.origin))
+            tissue_config = get_tissue_configurator(
+                self.config, tissue_id, stop_in_nuclei
+            )
             if last_id != tissue_id:
                 # On update le propagateur.
                 self.propagator = tissue_config.updatePropagator(self.propagator)
-            propagation_can_continue = (tissue_config.can_continue(line, self.mask) and
-                                        self.mask.is_voxmm_in_bound(*line[-1],
-                                        origin=self.origin))
+            propagation_can_continue = tissue_config.can_continue(
+                line, self.mask
+            ) and self.mask.is_voxmm_in_bound(*line[-1], origin=self.origin)
             last_dir = new_dir
         line = tissue_config.finalize_streamline(line, last_dir, self)
         # if tissue_config.is_valid_endpoint():
@@ -614,15 +667,16 @@ class TissueTracker(Tracker):
 
         # Last cleaning of the streamline
         # First position is the seed: necessarily in bound.
-        while (len(line) > 1 and
-                not self.propagator.is_voxmm_in_bound(line[-1],
-                                                        origin=self.origin)):
+        while len(line) > 1 and not self.propagator.is_voxmm_in_bound(
+            line[-1], origin=self.origin
+        ):
             line.pop()
-        
+
         if len(line) > 1:
-            tissue_id = int(self.mask.voxmm_to_value(*line[-1],
-                                                    origin=self.origin))
-            tissue_config = get_tissue_configurator(self.config, tissue_id, stop_in_nuclei)
+            tissue_id = int(self.mask.voxmm_to_value(*line[-1], origin=self.origin))
+            tissue_config = get_tissue_configurator(
+                self.config, tissue_id, stop_in_nuclei
+            )
             if tissue_config.is_valid_endpoint():
                 return line
         return []
